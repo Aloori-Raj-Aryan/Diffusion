@@ -24,7 +24,7 @@ class AttentionBlock(nn.Module):
     def __init__(self, channels: int, num_heads: int = 4):
         super().__init__()
         self.norm = nn.GroupNorm(8, channels)
-        self.attn = nn.MultiheadAttention(channels, num_heads, batch_first=True)
+        self.attn = nn.MultiheadAttention(channels,+ num_heads, batch_first=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, C, H, W = x.shape
