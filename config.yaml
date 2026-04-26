@@ -1,6 +1,18 @@
 paths:
   dataset_path: D:\Baagupadu\Datasets\diffusion
+  checkpoint_dir: runs/checkpoints
 
+checkpoints:
+  best:
+    monitor: val_loss
+    mode: min
+    filename: best
+    save_top_k: 1
+  latest:
+  
+    interval: 10
+    filename: latest
+    save_top_k: 1
 training:
   # Model configuration
   image_size: 32

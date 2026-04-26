@@ -1,9 +1,11 @@
 import torch
 from pathlib import Path
-import logging
+import pytorch_lightning as pl
 from torchvision import transforms
-from PIL import Image
 from torch.utils.data import DataLoader, random_split
+import torchvision
+from torchvision.io import ImageReadMode
+
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"}
 
 class FlatImageDataset(torch.utils.data.Dataset):
@@ -12,7 +14,7 @@ class FlatImageDataset(torch.utils.data.Dataset):
     def __init__(self, root: str, transform=None):
         self.transform = transform
         self.paths = [
-            p for p in Path(root).rglob("*")
+            str(p) for p in Path(root).rglob("*")
             if p.suffix.lower() in VALID_EXTENSIONS
         ]
         if not self.paths:
@@ -22,7 +24,7 @@ class FlatImageDataset(torch.utils.data.Dataset):
         return len(self.paths)
 
     def __getitem__(self, idx):
-        img = Image.open(self.paths[idx]).convert("RGB")
+        img =  torchvision.io.read_image(self.paths[idx], mode=ImageReadMode.RGB).float()
         if self.transform:
             img = self.transform(img)
         return img, 0   # dummy label — keeps DataLoader interface consistent
@@ -35,8 +37,7 @@ def build_dataloaders(cfg: dict) -> tuple[DataLoader, DataLoader]:
     transform = transforms.Compose([
         transforms.Resize((train_cfg["image_size"], train_cfg["image_size"])),
         transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5]),   # → [-1, 1]
+        transforms.Normalize([127.5]*3, [127.5]*3),   # → [-1, 1]
     ])
 
     dataset = FlatImageDataset(root=paths["dataset_path"], transform=transform)
@@ -66,3 +67,16 @@ def build_dataloaders(cfg: dict) -> tuple[DataLoader, DataLoader]:
     )
     return train_loader, val_loader
 
+class DiffusionDataModule(pl.LightningDataModule):
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+
+    def setup(self, stage=None):
+        self.train_loader, self.val_loader = build_dataloaders(self.cfg)
+
+    def train_dataloader(self):
+        return self.train_loader
+
+    def val_dataloader(self):
+        return self.val_loader

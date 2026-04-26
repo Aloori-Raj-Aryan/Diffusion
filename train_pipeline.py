@@ -3,21 +3,17 @@ from pathlib import Path
 from datetime import datetime
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.utils import save_image, make_grid
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
 
 from model.model import UNet
-from model.scheduler import DDPMScheduler
-from utils.dataloader import build_dataloaders
+from utils.scheduler import DDPMScheduler
+from utils.dataloader import DiffusionDataModule
+from utils.sampler import ddpm_sample
+from utils.checkpoints import get_checkpoints
 
 
-# ─────────────────────────────────────────────────────────────
-# Lightning Module
-# ─────────────────────────────────────────────────────────────
 class DiffusionLightning(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
@@ -99,59 +95,6 @@ class DiffusionLightning(pl.LightningModule):
         )
 
 
-# ─────────────────────────────────────────────────────────────
-# DataModule (cleaner data handling)
-# ─────────────────────────────────────────────────────────────
-class DiffusionDataModule(pl.LightningDataModule):
-    def __init__(self, cfg):
-        super().__init__()
-        self.cfg = cfg
-
-    def setup(self, stage=None):
-        self.train_loader, self.val_loader = build_dataloaders(self.cfg)
-
-    def train_dataloader(self):
-        return self.train_loader
-
-    def val_dataloader(self):
-        return self.val_loader
-
-
-# ─────────────────────────────────────────────────────────────
-# DDPM Sampler (same as yours)
-# ─────────────────────────────────────────────────────────────
-@torch.no_grad()
-def ddpm_sample(model, scheduler, shape, device, num_steps=1000):
-    x = torch.randn(shape, device=device)
-
-    for t_val in reversed(range(num_steps)):
-        t = torch.full((shape[0],), t_val, device=device, dtype=torch.long)
-        pred_noise = model(x, t)
-
-        alpha = scheduler.alphas[t_val]
-        alpha_bar = scheduler.alphas_cumprod[t_val]
-        beta = scheduler.betas[t_val]
-
-        x0_pred = (x - (1 - alpha_bar).sqrt() * pred_noise) / alpha_bar.sqrt()
-        x0_pred = x0_pred.clamp(-1, 1)
-
-        mean = (alpha.sqrt() * (1 - scheduler.alphas_cumprod_prev[t_val]) * x
-                + scheduler.alphas_cumprod_prev[t_val].sqrt() * beta * x0_pred) \
-               / (1 - alpha_bar)
-
-        if t_val > 0:
-            noise = torch.randn_like(x)
-            var = scheduler.posterior_variance[t_val].clamp(min=1e-20)
-            x = mean + var.sqrt() * noise
-        else:
-            x = mean
-
-    return x
-
-
-# ─────────────────────────────────────────────────────────────
-# Main
-# ─────────────────────────────────────────────────────────────
 def main():
     import argparse
     parser = argparse.ArgumentParser()
@@ -165,22 +108,19 @@ def main():
     data_module = DiffusionDataModule(cfg)
 
     run_dir = Path("runs") / datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=run_dir / "checkpoints",
-        save_top_k=1,
-        monitor="val_loss",
-        mode="min",
-        filename="best",
-    )
+    
+    # Update checkpoint dir in config to include run_dir
+    cfg.setdefault("paths", {})["checkpoint_dir"] = str(run_dir / "checkpoints")
+    
+    # Get all checkpoint callbacks from config
+    checkpoint_callbacks = get_checkpoints(cfg)
 
     trainer = pl.Trainer(
         max_epochs=cfg["training"]["epochs"],
         accelerator="auto",
         devices="auto",
         precision=16,  # mixed precision (optional but recommended)
-        callbacks=[checkpoint_callback],
-        log_every_n_steps=cfg["training"]["log_interval"],
+        callbacks=checkpoint_callbacks
     )
 
     trainer.fit(model, datamodule=data_module)
