@@ -21,7 +21,6 @@ class DiffusionLightning(pl.LightningModule):
         # Model
         self.model = UNet(
             image_size=self.train_cfg["image_size"],
-            model_channels=self.train_cfg["model_channels"],
         )
 
     def setup(self, stage=None):
