@@ -9,28 +9,25 @@ checkpoints:
     filename: best
     save_top_k: 1
   latest:
-  
     interval: 10
     filename: latest
     save_top_k: 1
 training:
   # Model configuration
-  image_size: 32
-  model_channels: 128
+  image_size: 256
   num_timesteps: 1000
+  model_channels: 128
+  time_embedding_dim: 512
   
   # Training parameters
   batch_size: 32
   learning_rate: 0.0001
   epochs: 100
   val_split: 0.1
-  val_interval: 5
   save_interval: 10
-  log_interval: 100
   
   # Optimization
   max_grad_norm: 1.0
-  weight_decay: 0.01
 
 inference:
   # Inference parameters

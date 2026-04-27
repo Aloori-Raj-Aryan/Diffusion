@@ -3,129 +3,121 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from model.embedder import SinusoidalPositionEmbedding
-from model.basicblocks import ResBlock, AttentionBlock, Downsample, Upsample
+from model.basicblocks import ResBlock, Downsample, Upsample
+
 
 class UNet(nn.Module):
-    """
-    U-Net for noise prediction in DDPM.
-
-    Args:
-        image_size:      Spatial resolution of input images.
-        in_channels:     Number of image channels (e.g. 3 for RGB).
-        model_channels:  Base channel width; doubled at each down-scale.
-        num_res_blocks:  ResBlocks per resolution level.
-        attn_resolutions: Resolutions at which self-attention is applied.
-        dropout:         Dropout probability inside ResBlocks.
-    """
+    """Basic UNet architecture for diffusion models with time conditioning."""
 
     def __init__(
         self,
         image_size: int = 32,
         in_channels: int = 3,
-        model_channels: int = 128,
-        num_res_blocks: int = 2,
-        attn_resolutions: tuple = (8, 16),
-        dropout: float = 0.1,
+        time_embedding_dim: int = 512,
     ):
         super().__init__()
-        ch = model_channels
-        time_emb_dim = ch * 4
+        self.image_size = image_size
+        self.in_channels = in_channels
+        self.time_embedding_dim = time_embedding_dim
+
+        # Hardcoded hyperparameters
 
         # Time embedding
         self.time_embed = nn.Sequential(
-            SinusoidalPositionEmbedding(ch),
-            nn.Linear(ch, time_emb_dim),
+            SinusoidalPositionEmbedding(128),
+            nn.Linear(128, time_embedding_dim),
             nn.SiLU(),
-            nn.Linear(time_emb_dim, time_emb_dim),
+            nn.Linear(time_embedding_dim, time_embedding_dim),
         )
 
-        # Channel schedule: [ch, ch*2, ch*4]
-        ch_mult = [1, 2, 4]
-        channels = [ch * m for m in ch_mult]
+        # ── Encoder Level 1 (ch=128) ──────────────────────────────────────────
+        self.input_conv = nn.Conv2d(in_channels, 128, 3, padding=1)
+        self.enc1_block1 = ResBlock(128, 128, time_embedding_dim)
+        self.enc1_block2 = ResBlock(128, 128, time_embedding_dim)
+        self.down1 = Downsample(128)
 
-        # ── Encoder ───────────────────────────────────────────────────────────
-        self.input_conv = nn.Conv2d(in_channels, ch, 3, padding=1)
+        # ── Encoder Level 2 (ch=256) ──────────────────────────────────────────
+        self.enc2_block1 = ResBlock(128, 256, time_embedding_dim)
+        self.enc2_block2 = ResBlock(256, 256, time_embedding_dim)
+        self.down2 = Downsample(256)
 
-        self.down_blocks = nn.ModuleList()
-        self.down_samples = nn.ModuleList()
-        self.down_attns = nn.ModuleList()
+        # ── Encoder Level 3 (ch=512) ──────────────────────────────────────────
+        self.enc3_block1 = ResBlock(256, 512, time_embedding_dim)
+        self.enc3_block2 = ResBlock(512, 512, time_embedding_dim)
 
-        cur_res = image_size
-        prev_ch = ch
-        for out_ch in channels:
-            blocks = nn.ModuleList(
-                [ResBlock(prev_ch if i == 0 else out_ch, out_ch, time_emb_dim, dropout)
-                 for i in range(num_res_blocks)]
-            )
-            self.down_blocks.append(blocks)
-            self.down_attns.append(
-                AttentionBlock(out_ch) if cur_res in attn_resolutions else nn.Identity()
-            )
-            self.down_samples.append(
-                Downsample(out_ch) if out_ch != channels[-1] else nn.Identity()
-            )
-            prev_ch = out_ch
-            if out_ch != channels[-1]:
-                cur_res //= 2
+        # ── Bottleneck (ch=512) ────────────────────────────────────────────────
+        self.mid_block1 = ResBlock(512, 512, time_embedding_dim)
+        self.mid_block2 = ResBlock(512, 512, time_embedding_dim)
 
-        # ── Bottleneck ────────────────────────────────────────────────────────
-        bot_ch = channels[-1]
-        self.mid_block1 = ResBlock(bot_ch, bot_ch, time_emb_dim, dropout)
-        self.mid_attn = AttentionBlock(bot_ch)
-        self.mid_block2 = ResBlock(bot_ch, bot_ch, time_emb_dim, dropout)
+        # ── Decoder Level 3 (ch=512) ──────────────────────────────────────────
+        self.dec3_block1 = ResBlock(512 + 512, 512, time_embedding_dim)
+        self.dec3_block2 = ResBlock(512, 512, time_embedding_dim)
+        self.up3 = Upsample(512)
 
-        # ── Decoder ───────────────────────────────────────────────────────────
-        self.up_blocks = nn.ModuleList()
-        self.up_samples = nn.ModuleList()
-        self.up_attns = nn.ModuleList()
+        # ── Decoder Level 2 (ch=256) ──────────────────────────────────────────
+        self.dec2_block1 = ResBlock(512 + 256, 256, time_embedding_dim)
+        self.dec2_block2 = ResBlock(256, 256, time_embedding_dim)
+        self.up2 = Upsample(256)
 
-        rev_channels = list(reversed(channels))
-        for i, out_ch in enumerate(rev_channels):
-            in_ch = rev_channels[i - 1] if i > 0 else bot_ch
-            skip_ch = out_ch  # from encoder skip connection
-            blocks = nn.ModuleList(
-                [ResBlock(in_ch + skip_ch if i2 == 0 else out_ch, out_ch, time_emb_dim, dropout)
-                 for i2 in range(num_res_blocks)]
-            )
-            self.up_blocks.append(blocks)
-            self.up_attns.append(
-                AttentionBlock(out_ch) if cur_res in attn_resolutions else nn.Identity()
-            )
-            self.up_samples.append(
-                Upsample(out_ch) if i < len(rev_channels) - 1 else nn.Identity()
-            )
-            if i < len(rev_channels) - 1:
-                cur_res *= 2
+        # ── Decoder Level 1 (ch=128) ──────────────────────────────────────────
+        self.dec1_block1 = ResBlock(256 + 128, 128, time_embedding_dim)
+        self.dec1_block2 = ResBlock(128, 128, time_embedding_dim)
 
-        self.out_norm = nn.GroupNorm(8, ch)
-        self.out_conv = nn.Conv2d(ch, in_channels, 1)
+        # ── Output ─────────────────────────────────────────────────────────────
+        self.out_norm = nn.GroupNorm(8, 128)
+        self.out_conv = nn.Conv2d(128, 3, 1)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass.
+
+        Args:
+            x: Input tensor of shape (batch_size, in_channels, height, width)
+            t: Time tensor of shape (batch_size,)
+
+        Returns:
+            Output tensor of shape (batch_size, 3, height, width)
+        """
         t_emb = self.time_embed(t)
 
+        # ── Encoder ────────────────────────────────────────────────────────────
         h = self.input_conv(x)
-        skips = [h]
+        
+        # Level 1 (32x32)
+        h1 = self.enc1_block1(h, t_emb)
+        h1 = self.enc1_block2(h1, t_emb)
+        h = self.down1(h1)
 
-        # Encoder
-        for blocks, attn, down in zip(self.down_blocks, self.down_attns, self.down_samples):
-            for block in blocks:
-                h = block(h, t_emb)
-            h = attn(h) if isinstance(attn, AttentionBlock) else h
-            skips.append(h)
-            h = down(h)
+        # Level 2 (16x16)
+        h2 = self.enc2_block1(h, t_emb)
+        h2 = self.enc2_block2(h2, t_emb)
+        h = self.down2(h2)
 
-        # Bottleneck
-        h = self.mid_block1(h, t_emb)
-        h = self.mid_attn(h)
+        # Level 3 (8x8)
+        h3 = self.enc3_block1(h, t_emb)
+        h3 = self.enc3_block2(h3, t_emb)
+
+        # ── Bottleneck (8x8) ───────────────────────────────────────────────────
+        h = self.mid_block1(h3, t_emb)
         h = self.mid_block2(h, t_emb)
 
-        # Decoder
-        for blocks, attn, up in zip(self.up_blocks, self.up_attns, self.up_samples):
-            skip = skips.pop()
-            h = torch.cat([h, skip], dim=1)
-            for block in blocks:
-                h = block(h, t_emb)
-            h = attn(h) if isinstance(attn, AttentionBlock) else h
-            h = up(h)
+        # ── Decoder ────────────────────────────────────────────────────────────
+        # Level 3 (8x8)
+        h = torch.cat([h, h3], dim=1)
+        h = self.dec3_block1(h, t_emb)
+        h = self.dec3_block2(h, t_emb)
+        h = self.up3(h)
 
+        # Level 2 (16x16)
+        h = torch.cat([h, h2], dim=1)
+        h = self.dec2_block1(h, t_emb)
+        h = self.dec2_block2(h, t_emb)
+        h = self.up2(h)
+
+        # Level 1 (32x32)
+        h = torch.cat([h, h1], dim=1)
+        h = self.dec1_block1(h, t_emb)
+        h = self.dec1_block2(h, t_emb)
+
+        # ── Output ─────────────────────────────────────────────────────────────
         return self.out_conv(F.silu(self.out_norm(h)))
