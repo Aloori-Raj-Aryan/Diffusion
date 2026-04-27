@@ -36,7 +36,6 @@ def main():
         precision=16,  # mixed precision (optional but recommended)
         callbacks=checkpoint_callbacks,
         logger=logger,
-        default_root_dir="outputs",
     )
 
     trainer.fit(model, datamodule=data_module)
