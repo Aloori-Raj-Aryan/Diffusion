@@ -64,7 +64,7 @@ class DiffusionLightning(pl.LightningModule):
         
         return loss
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self, outputs):
         # Generate and log sample images every few epochs
         if (self.current_epoch + 1) % 10 == 0:  # Log every 10 epochs
             with torch.no_grad():
