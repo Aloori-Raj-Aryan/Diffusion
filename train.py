@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import datetime
 import argparse
 
+import torch
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from utils.dataloader import DiffusionDataModule
@@ -19,15 +20,19 @@ def main():
 
     model = DiffusionLightning(cfg)
     data_module = DiffusionDataModule(cfg)
-    
+
+    # Use fast cuDNN kernels when image size is fixed and GPU is available
+    torch.backends.cudnn.benchmark = True
+    use_gpu = torch.cuda.is_available()
+
     # Set up TensorBoard logger
-    logger = TensorBoardLogger(save_dir="outputs", name="diffusion",)
+    logger = TensorBoardLogger(save_dir="outputs", name="diffusion")
     checkpoint_callbacks = get_checkpoints(cfg)
     trainer = pl.Trainer(
         max_epochs=cfg["training"]["epochs"],
-        accelerator="auto",
-        devices="auto",
-        precision=16,  # mixed precision (optional but recommended)
+        accelerator="gpu" if use_gpu else "cpu",
+        devices=1,
+        precision=16 if use_gpu else 32,
         callbacks=checkpoint_callbacks,
         logger=logger,
     )

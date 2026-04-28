@@ -1,3 +1,4 @@
+import os
 import torch
 from pathlib import Path
 import pytorch_lightning as pl
@@ -49,20 +50,28 @@ def build_dataloaders(cfg: dict) -> tuple[DataLoader, DataLoader]:
         generator=torch.Generator().manual_seed(42),
     )
 
+    cpu_count = os.cpu_count() or 4
+    train_workers = min(4, max(1, cpu_count // 2))
+    val_workers = max(1, train_workers // 2)
+
     train_loader = DataLoader(
         train_ds,
         batch_size=train_cfg["batch_size"],
         shuffle=True,
-        num_workers=4,
+        num_workers=train_workers,
         pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=2,
         drop_last=True,
     )
     val_loader = DataLoader(
         val_ds,
         batch_size=train_cfg["batch_size"],
         shuffle=False,
-        num_workers=2,
+        num_workers=val_workers,
         pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=2,
         drop_last=False,
     )
     return train_loader, val_loader

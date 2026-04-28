@@ -17,7 +17,7 @@ class DiffusionLightning(pl.LightningModule):
         self.scheduler = DDPMScheduler(num_timesteps=self.train_cfg["num_timesteps"])
 
         # Model
-        self.model = UNet(image_size=self.train_cfg["image_size"],)
+        self.model = UNet(cfg)
 
     def setup(self, stage=None):
         self.scheduler = self.scheduler.to(self.device)
