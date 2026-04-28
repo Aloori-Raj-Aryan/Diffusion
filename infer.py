@@ -53,10 +53,10 @@ class ResidualBlock(nn.Module):
             nn.SiLU(),
         )
         self.block = nn.Sequential(
-            nn.GroupNorm(32, in_channels),
+            nn.BatchNorm2d(in_channels),
             nn.SiLU(),
             nn.Conv2d(in_channels, out_channels, 3, padding=1),
-            nn.GroupNorm(32, out_channels),
+            nn.BatchNorm2d(out_channels),
             nn.SiLU(),
             nn.Conv2d(out_channels, out_channels, 3, padding=1),
         )
@@ -107,7 +107,7 @@ class DiffusionModel(nn.Module):
         
         # Output
         self.conv_out = nn.Sequential(
-            nn.GroupNorm(32, model_channels),
+            nn.BatchNorm2d(model_channels),
             nn.SiLU(),
             nn.Conv2d(model_channels, in_channels, 3, padding=1),
         )

@@ -1,6 +1,6 @@
 paths:
   dataset_path: D:\Baagupadu\Datasets\diffusion
-  checkpoint_dir: runs/checkpoints
+  checkpoint_dir: runs\checkpoints
 
 checkpoints:
   best:
@@ -12,25 +12,25 @@ checkpoints:
     interval: 10
     filename: latest
     save_top_k: 1
+
 training:
-  # Model configuration
   image_size: 256
   num_timesteps: 1000
-  model_channels: 128
-  time_embedding_dim: 512
+  time_embedding_dim: 128
+  model_channels:
+    - 3
+    - 32
+    - 64
+    - 128
+    - 256
   
   # Training parameters
   batch_size: 32
   learning_rate: 0.0001
   epochs: 100
   val_split: 0.1
-  save_interval: 10
-  
-  # Optimization
-  max_grad_norm: 1.0
 
 inference:
-  # Inference parameters
   num_samples: 16
   num_inference_steps: 100
   guidance_scale: 1.0

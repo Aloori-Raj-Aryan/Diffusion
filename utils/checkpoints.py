@@ -5,7 +5,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 def get_checkpoints(cfg: dict) -> list:
    
     checkpoints_list = []
-    checkpoint_dir = Path(cfg.get("paths", {}).get("checkpoint_dir", "runs/checkpoints"))
+    checkpoint_dir = Path(cfg.get("paths", {}).get("checkpoint_dir", "runs\checkpoints"))
     
     for ckpt_name, ckpt_cfg in cfg.get("checkpoints", {}).items():
         # Set defaults
@@ -14,7 +14,6 @@ def get_checkpoints(cfg: dict) -> list:
         
         # Create callback based on type
         if ckpt_name == "latest":
-            # Save every N steps/epochs
             callback = ModelCheckpoint(
                 dirpath=checkpoint_dir,
                 save_top_k=save_top_k,  # Save all checkpoints

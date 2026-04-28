@@ -14,14 +14,10 @@ class DiffusionLightning(pl.LightningModule):
         self.train_cfg = cfg["training"]
 
         # DDPM Scheduler
-        self.scheduler = DDPMScheduler(
-            num_timesteps=self.train_cfg["num_timesteps"]
-        )
+        self.scheduler = DDPMScheduler(num_timesteps=self.train_cfg["num_timesteps"])
 
         # Model
-        self.model = UNet(
-            image_size=self.train_cfg["image_size"],
-        )
+        self.model = UNet(image_size=self.train_cfg["image_size"],)
 
     def setup(self, stage=None):
         self.scheduler = self.scheduler.to(self.device)
@@ -38,14 +34,7 @@ class DiffusionLightning(pl.LightningModule):
         pred_noise = self(x_t, t)
 
         loss = F.mse_loss(pred_noise, noise)
-
-        # Log training metrics
-        self.log("train_loss", loss, prog_bar=True)
-        
-        # Log learning rate
-        lr = self.trainer.optimizers[0].param_groups[0]['lr']
-        self.log("learning_rate", lr, prog_bar=False)
-        
+        self.log("train_loss", loss, prog_bar=True, on_epoch = True)
         return loss
 
     # ── Validation ────────────────────────────────────────────
@@ -57,11 +46,7 @@ class DiffusionLightning(pl.LightningModule):
         pred_noise = self(x_t, t)
 
         loss = F.mse_loss(pred_noise, noise)
-        self.log("val_loss", loss, prog_bar=True)
-        
-        # Log additional validation metrics
-        self.log("val_mse", loss, prog_bar=False)
-        
+        self.log("val_loss", loss, prog_bar=True)      
         return loss
 
     def on_validation_epoch_end(self):

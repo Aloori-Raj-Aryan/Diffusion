@@ -21,14 +21,8 @@ def main():
     data_module = DiffusionDataModule(cfg)
     
     # Set up TensorBoard logger
-    logger = TensorBoardLogger(
-        save_dir="outputs",
-        name="diffusion",
-    )
-    
-    # Get all checkpoint callbacks from config
+    logger = TensorBoardLogger(save_dir="outputs", name="diffusion",)
     checkpoint_callbacks = get_checkpoints(cfg)
-
     trainer = pl.Trainer(
         max_epochs=cfg["training"]["epochs"],
         accelerator="auto",
