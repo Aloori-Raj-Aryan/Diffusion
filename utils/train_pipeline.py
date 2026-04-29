@@ -51,17 +51,16 @@ class DiffusionLightning(pl.LightningModule):
 
     def on_validation_epoch_end(self):
         # Generate and log sample images every few epochs
-        if (self.current_epoch + 1) % 10 == 0:  # Log every 10 epochs
-            with torch.no_grad():
-                samples = self.sample(n=4)  # Generate 4 sample images
-                
-                # Log images to TensorBoard
-                self.logger.experiment.add_images(
-                    "generated_samples", 
-                    samples, 
-                    self.current_epoch,
-                    dataformats='NCHW'
-                )
+        with torch.no_grad():
+            samples = self.sample(n=4)  # Generate 4 sample images
+            
+            # Log images to TensorBoard
+            self.logger.experiment.add_images(
+                "generated_samples", 
+                samples, 
+                self.current_epoch,
+                dataformats='NCHW'
+            )
 
     # ── Optimizer + Scheduler ─────────────────────────────────
     def configure_optimizers(self):
