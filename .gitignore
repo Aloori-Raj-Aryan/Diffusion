@@ -1,5 +1,7 @@
 # Folders
 runs*
+outputs*
+generated_samples*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
