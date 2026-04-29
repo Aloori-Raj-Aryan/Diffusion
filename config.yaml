@@ -12,6 +12,10 @@ checkpoints:
     interval: 10
     filename: latest
     save_top_k: 1
+  early_stopping:
+    monitor: val_loss
+    mode: min
+    patience: 10
 
 training:
   image_size: 256

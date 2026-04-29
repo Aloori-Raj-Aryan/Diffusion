@@ -1,5 +1,5 @@
 from pathlib import Path
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 
 def get_checkpoints(cfg: dict) -> list:
@@ -28,6 +28,13 @@ def get_checkpoints(cfg: dict) -> list:
                 monitor=ckpt_cfg.get("monitor", "val_loss"),
                 mode=ckpt_cfg.get("mode", "min"),
                 filename=filename,
+            )
+        
+        elif ckpt_name == "early_stopping":
+            callback = EarlyStopping(
+                monitor=ckpt_cfg.get("monitor", "val_loss"),
+                mode=ckpt_cfg.get("mode", "min"),
+                patience=ckpt_cfg.get("patience", 10),
             )
         else:
             raise ValueError(f"Unknown checkpoint type: {ckpt_name}")
