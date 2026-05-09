@@ -9,7 +9,7 @@ from tqdm import tqdm
 import numpy as np
 from PIL import Image
 
-from utils.train_pipeline import DiffusionLightning
+from model.train_pipeline import DiffusionLightning
 from utils.scheduler import DDPMScheduler
 from utils.sampler import ddpm_sample
 

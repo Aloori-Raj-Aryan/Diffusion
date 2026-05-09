@@ -8,7 +8,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from utils.dataloader import DiffusionDataModule
 from utils.checkpoints import get_checkpoints
-from utils.train_pipeline import DiffusionLightning
+from model.train_pipeline import DiffusionLightning
 
 def main():
     parser = argparse.ArgumentParser()
