@@ -1,3 +1,7 @@
+images:
+  image_size: 256
+  patch_size: 16
+
 paths:
   dataset_path: D:\Baagupadu\Datasets\diffusion
   checkpoint_dir: runs\checkpoints
