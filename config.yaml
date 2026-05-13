@@ -40,5 +40,5 @@ training:
 
 inference:
   num_samples: 16
-  num_inference_steps: 100
+  num_inference_steps: 1000
   guidance_scale: 1.0

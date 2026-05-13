@@ -57,21 +57,24 @@ def main():
     print(f"Loading model from {args.checkpoint}...")
     
     # Load model
-    model = load_model(args.checkpoint, device, base_config)
+    lightning_model = load_model(args.checkpoint, device, base_config)
+    model = lightning_model.model
     
     # Create scheduler
-    scheduler = DDPMScheduler(num_timesteps=base_config["inference"]["num_inference_steps"])
+    scheduler = lightning_model.scheduler
     scheduler = scheduler.to(device)
     
     # Generate samples
     print(f"Generating {args.num_samples} samples...")
     samples = ddpm_sample(
-        model=model,
-        scheduler=scheduler,
-        shape=(args.num_samples, 3, base_config["training"]["image_size"], base_config["training"]["image_size"]),
-        device=device,
-        num_steps=args.num_steps
-    )
+    model=model,
+    scheduler=scheduler,
+    shape=(args.num_samples, 3,
+           base_config["training"]["image_size"],
+           base_config["training"]["image_size"]),
+    device=device,
+    num_steps=base_config["training"]["num_timesteps"]
+)
     
     # Save samples
     save_samples(samples, args.output_dir)
