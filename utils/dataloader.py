@@ -25,7 +25,7 @@ class FlatImageDataset(torch.utils.data.Dataset):
         return len(self.paths)
 
     def __getitem__(self, idx):
-        img =  torchvision.io.read_image(self.paths[idx], mode=ImageReadMode.RGB).float()
+        img =  torchvision.io.read_image(self.paths[idx], mode=ImageReadMode.RGB).float()/255.0
         if self.transform:
             img = self.transform(img)
         return img, 0   # dummy label — keeps DataLoader interface consistent
@@ -38,7 +38,7 @@ def build_dataloaders(cfg: dict) -> tuple[DataLoader, DataLoader]:
     transform = transforms.Compose([
         transforms.Resize((train_cfg["image_size"], train_cfg["image_size"])),
         transforms.RandomHorizontalFlip(),
-        transforms.Normalize([127.5]*3, [127.5]*3),   # → [-1, 1]
+        transforms.Normalize( [0.485, 0.456, 0.406],  [0.229, 0.224, 0.225]),
     ])
 
     dataset = FlatImageDataset(root=paths["dataset_path"], transform=transform)
